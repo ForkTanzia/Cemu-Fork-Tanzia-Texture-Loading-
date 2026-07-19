@@ -362,3 +362,4 @@ void LatteTexture_MarkDynamicTextureAsChanged(LatteTextureView* textureView, sin
 void LatteTexture_UpdateTextureFromDynamicChanges(LatteTexture* texture);
 
 void LatteTexture_UpdateDataToLatest(LatteTexture* texture);
+uint32 LatteTexture_HashData(const uint8* dataPtr, uint32 memRange, uint32 pixelCount, bool isCompressedFormat, bool useLightHash);

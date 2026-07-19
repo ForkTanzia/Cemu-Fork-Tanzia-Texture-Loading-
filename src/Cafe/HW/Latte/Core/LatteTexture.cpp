@@ -7,6 +7,7 @@
 #include "Cafe/HW/Latte/LatteAddrLib/LatteAddrLib.h"
 
 #include "Cafe/GraphicPack/GraphicPack2.h"
+#include "Cafe/HW/Latte/Core/LatteTextureReplace.h"
 
 #include <boost/container/small_vector.hpp>
 
@@ -1304,6 +1305,26 @@ LatteTexture::LatteTexture(Latte::E_DIM dim, MPTR physAddress, MPTR physMipAddre
 			if (rule.overwrite_settings.anistropic_value != -1)
 			{
 				this->overwriteInfo.anisotropicLevel = rule.overwrite_settings.anistropic_value;
+			}
+		}
+	}
+	// [texture replacement] auto-size/format from a custom DDS (no [TextureRedefine] rule needed)
+	if (!this->overwriteInfo.hasResolutionOverwrite && LatteTextureReplace::IsEnabled())
+	{
+		LatteAddrLib::AddrSurfaceInfo_OUT _replSI;
+		LatteAddrLib::GX2CalculateSurfaceInfo(format, width, height, depth, dim, Latte::MakeGX2TileMode(tileMode), 0, 0, &_replSI);
+		uint32 _replHash = LatteTextureReplace::HashGuest(this->physAddress, (uint32)_replSI.surfSize, width * height, format);
+		LatteTextureReplace::ReplacementInfo _ri;
+		if (LatteTextureReplace::GetInfo(_replHash, _ri))
+		{
+			this->overwriteInfo.hasResolutionOverwrite = true;
+			this->overwriteInfo.width = _ri.width;
+			this->overwriteInfo.height = _ri.height;
+			this->overwriteInfo.depth = depth;
+			if (_ri.hasFormat && _ri.gx2Format != (uint32)format)
+			{
+				this->overwriteInfo.hasFormatOverwrite = true;
+				this->overwriteInfo.format = (sint32)_ri.gx2Format;
 			}
 		}
 	}

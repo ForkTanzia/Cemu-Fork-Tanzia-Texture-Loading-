@@ -2,6 +2,8 @@
 #include "Cafe/HW/Latte/LatteAddrLib/LatteAddrLib.h"
 #include "config/ActiveSettings.h"
 #include "Cafe/CafeSystem.h"
+#include "Cafe/HW/Latte/Core/LatteTextureReplace.h"
+uint32 LatteTexture_CalculateTextureDataHash(LatteTexture* hostTexture);
 
 //#define BENCHMARK_TEXTURE_DECODING		// if defined, time it takes to decode textures will be measured and logged to log.txt
 
@@ -569,6 +571,17 @@ void decodeBC5Block_SNORM(uint8* blockStorage, float* rgOutput) // todo - can me
 	}
 }
 
+static void _downsampleRGBA_repl(const uint8* src, int sw, int sh, uint8* dst, int dw, int dh)
+{
+	for (int y = 0; y < dh; y++) for (int x = 0; x < dw; x++) {
+		int sx0 = x*sw/dw, sx1 = std::max(sx0+1,(x+1)*sw/dw);
+		int sy0 = y*sh/dh, sy1 = std::max(sy0+1,(y+1)*sh/dh);
+		uint32 acc[4]={0,0,0,0}, n=0;
+		for (int sy=sy0; sy<sy1; sy++) for (int sx=sx0; sx<sx1; sx++) { const uint8* p=src+(sy*sw+sx)*4; acc[0]+=p[0];acc[1]+=p[1];acc[2]+=p[2];acc[3]+=p[3];n++; }
+		uint8* d=dst+(y*dw+x)*4; for(int cc=0;cc<4;cc++) d[cc]=(uint8)(acc[cc]/std::max(1u,n));
+	}
+}
+
 void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint32 width, sint32 height, sint32 depth, sint32 mipLevels, void* pixelData, sint32 sliceIndex, sint32 mipIndex, uint32 compressedImageSize)
 {
 	if (mipIndex == 0)
@@ -578,7 +591,32 @@ void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint
 		cemu_assert_debug(depth == hostTexture->depth);
 	}
 	cemu_assert_debug(mipLevels == hostTexture->mipLevels);
-	if (hostTexture->overwriteInfo.hasResolutionOverwrite || hostTexture->overwriteInfo.hasFormatOverwrite)
+	const bool overwritten = hostTexture->overwriteInfo.hasResolutionOverwrite || hostTexture->overwriteInfo.hasFormatOverwrite;
+	if (overwritten && LatteTextureReplace::IsEnabled())
+	{
+		const LatteTextureReplace_Entry* slice = LatteTextureReplace::GetSlice(hostTexture->texDataHash2, mipIndex);
+		if (slice)
+		{
+			sint32 hostW = std::max<sint32>(1, (hostTexture->overwriteInfo.hasResolutionOverwrite ? hostTexture->overwriteInfo.width  : hostTexture->width)  >> mipIndex);
+			sint32 hostH = std::max<sint32>(1, (hostTexture->overwriteInfo.hasResolutionOverwrite ? hostTexture->overwriteInfo.height : hostTexture->height) >> mipIndex);
+			if (slice->isCompressed && slice->width == hostW && slice->height == hostH)
+			{
+				g_renderer->texture_loadSlice(hostTexture, hostW, hostH, depth, slice->data, sliceIndex, mipIndex, slice->dataSize);
+				return;
+			}
+			if (!slice->isCompressed)
+			{
+				const uint8* rgba = slice->data; std::vector<uint8> tmp;
+				if (slice->width != hostW || slice->height != hostH)
+				{
+					const LatteTextureReplace_Entry* m0 = LatteTextureReplace::GetSlice(hostTexture->texDataHash2, 0);
+					if (m0 && !m0->isCompressed) { tmp.resize((size_t)hostW*hostH*4); _downsampleRGBA_repl(m0->data, m0->width, m0->height, tmp.data(), hostW, hostH); rgba = tmp.data(); }
+				}
+				if (rgba) { g_renderer->texture_loadSlice(hostTexture, hostW, hostH, depth, (void*)rgba, sliceIndex, mipIndex, hostW*hostH*4); return; }
+			}
+		}
+	}
+	if (overwritten)
 	{
 		// todo - ideally, we should scale/convert the data to the new format and resolution
 		g_renderer->texture_clearSlice(hostTexture, sliceIndex, mipIndex);
@@ -685,7 +723,8 @@ void LatteTextureLoader_UpdateTextureSliceData(LatteTexture* tex, uint32 sliceIn
 	if (textureLoader.dump)
 	{
 		fs::path path = ActiveSettings::GetUserDataPath("dump/textures");
-		path /= fmt::format("{:08x}_fmt{:04x}_slice{:d}_mip{:02d}_{:d}x{:d}_tm{:02d}.tga", physImagePtr, (uint32)tex->format, sliceIndex, mipIndex, tex->width, tex->height, tileMode);
+		uint32 texHashForDump = LatteTexture_CalculateTextureDataHash(tex);
+		path /= fmt::format("{:08x}_{:d}x{:d}_fmt{:04x}_mip{:02d}.tga", texHashForDump, tex->width, tex->height, (uint32)tex->format, mipIndex);
 		tga_write_rgba(path, textureLoader.width, textureLoader.height, textureLoader.dumpRGBA);
 		free(textureLoader.dumpRGBA);
 	}
