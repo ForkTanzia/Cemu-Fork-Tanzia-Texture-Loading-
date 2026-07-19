@@ -37,9 +37,6 @@ For compilation instructions, see [BUILD.md](BUILD.md).
 - **Cemu** by the Cemu project — https://github.com/cemu-project/Cemu (MPL-2.0)
 - **NGRP** HD texture project by **raccu** — https://www.raccu.com/releases/runtime/mh3u-3g/
 
-## License
-This fork is licensed under **MPL-2.0**, same as Cemu. See `LICENSE`.
-
 ## Support
 The fork and all tools are free to download and build. If it's been useful, you can
 optionally support my work:
@@ -48,4 +45,5 @@ optionally support my work:
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H8L623H70U)
 
 ## License
+This fork is licensed under **MPL-2.0**, same as Cemu.
 Cemu is licensed under [Mozilla Public License 2.0](/LICENSE.txt). Exempt from this are all files in the dependencies directory for which the licenses of the original code apply as well as some individual files in the src folder, as specified in those file headers respectively.
