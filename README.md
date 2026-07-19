@@ -41,7 +41,6 @@ For compilation instructions, see [BUILD.md](BUILD.md).
 The fork and all tools are free to download and build. If it's been useful, you can
 optionally support my work:
 
-<!-- paste Ko-fi's button snippet here, or: -->
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H8L623H70U)
 
 ## License
