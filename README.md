@@ -1,66 +1,51 @@
-# **Cemu - Wii U emulator**
+# Cemu - Fork Tanzia [Texture Loading]
+**A fork of Cemu made specifically for Monster Hunter 3 Ultimate (Wii U version) texture loading.**
 
-[![Build Process](https://github.com/cemu-project/Cemu/actions/workflows/build.yml/badge.svg)](https://github.com/cemu-project/Cemu/actions/workflows/build.yml)
-[![Discord](https://img.shields.io/discord/286429969104764928?label=Cemu&logo=discord&logoColor=FFFFFF)](https://discord.gg/5psYsup)
-[![Matrix Server](https://img.shields.io/matrix/cemu:cemu.info?server_fqdn=matrix.cemu.info&label=cemu:cemu.info&logo=matrix&logoColor=FFFFFF)](https://matrix.to/#/#cemu:cemu.info)
+> This project **not affiliated with nor endorsed by Cemu, Nintendo, or NGRP (by raccu).**
+> This is a free and open-source (MPL-2.0) community fork of Cemu.
 
-This is the code repository of Cemu, a Wii U emulator that is able to run most Wii U games and homebrew in a playable state.
-It's written in C/C++ and is being actively developed with new features and fixes.
+## What this is
+This is a fork that allows you to load custom textures, including upscale textures, on Cemu. 
+The fork adds **runtime custom-texture loading** - much like 3DS emulators - which allows
+for custom textures to load . While it is built with MH3U in mind, it could work for other
+games too.
 
-Cemu is currently only available for 64-bit Windows, Linux & macOS devices.
+Alongside it, there's a separate tool that converts textures from **NGRP by raccu** (an HD
+texture project for the *3DS* version of MH3U) into a form the Wii U version can use.
+**I do not own the NGRP assets, so I cannot distribute converted textures** — you get NGRP
+from its official source and run the converter yourself.
+➡️ Conversion scripts: [3DS-to-Wii U](https://github.com/ForkTanzia/MH3U-3DS-textures-to-Wii-U)
 
-### Links:
- - [Open Source Announcement](https://www.reddit.com/r/cemu/comments/wwa22c/cemu_20_announcement_linux_builds_opensource_and/)
- - [Official Website](https://cemu.info)
- - [Compatibility List/Wiki](https://wiki.cemu.info/wiki/Main_Page)
- - [Official Subreddit](https://reddit.com/r/Cemu)
- - [Official Discord](https://discord.gg/5psYsup)
- - [Official Matrix Server](https://matrix.to/#/#cemu:cemu.info)
- - [Setup Guide](https://cemu.cfw.guide)
+## How texture loading works
+- Place custom textures in `<Cemu>/load/textures/`.
+- Files are matched to game textures by content hash; the fork sizes each texture from the
+  replacement itself (no graphic-pack rules needed).
+- Supported: DDS (BC1–BC5, with mipmaps) and PNG/TGA.
+- Custom-texture loading is enabled by default in this build.
 
-#### Other relevant repositories:
- - [Cemu-Language](https://github.com/cemu-project/Cemu-Language)
- - [Cemu's Community Graphic Packs](https://github.com/cemu-project/cemu_graphic_packs)
+## Download & run (ready-to-use build)
+1. Go to the [Releases](../../releases) page and download the latest build.
+2. Extract the zip anywhere (a path **without spaces** is safest).
+3. Run `Cemu.exe` and set up your game as normal.
+4. Put your converted textures in `<Cemu>/load/textures/`.
 
-## Download
+## Building
 
-You can download the latest Cemu releases for Windows, Linux and Mac from the [GitHub Releases](https://github.com/cemu-project/Cemu/releases/). For Linux you can also find Cemu on [flathub](https://flathub.org/apps/info.cemu.Cemu).
+For compilation instructions, see [BUILD.md](BUILD.md).
 
-On Windows, Cemu is available both as an installer and in a portable format, where no installation is required besides extracting it in a safe place.
+## Credits
+- **Cemu** by the Cemu project — https://github.com/cemu-project/Cemu (MPL-2.0)
+- **NGRP** HD texture project by **raccu** — https://www.raccu.com/releases/runtime/mh3u-3g/
 
-The native macOS build is currently purely experimental and should not be considered stable or ready for issue-free gameplay. There are also known issues with degraded performance due to the use of MoltenVK and Rosetta for ARM Macs. We appreciate your patience while we improve Cemu for macOS.
+## License
+This fork is licensed under **MPL-2.0**, same as Cemu. See `LICENSE`.
 
-Pre-2.0 releases can be found on Cemu's [changelog page](https://cemu.info/changelog.html).
+## Support
+The fork and all tools are free to download and build. If it's been useful, you can
+optionally support my work:
 
-## Build Instructions
-
-To compile Cemu yourself on Windows, Linux or macOS, view [BUILD.md](/BUILD.md).
-
-## Issues
-
-Issues with the emulator should be filed using [GitHub Issues](https://github.com/cemu-project/Cemu/issues).  
-The old bug tracker can be found at [bugs.cemu.info](https://bugs.cemu.info) and still contains relevant issues and feature suggestions.
-
-## Contributing
-
-Pull requests are very welcome. For easier coordination you can visit the developer discussion channel on [Discord](https://discord.gg/5psYsup) or alternatively the [Matrix Server](https://matrix.to/#/#cemu:cemu.info).
-Before submitting a pull request, please read and follow our code style guidelines listed in [CODING_STYLE.md](/CODING_STYLE.md).
-
-If coding isn't your thing, testing games and making detailed bug reports or updating the (usually outdated) compatibility wiki is also appreciated!
-
-Questions about Cemu's software architecture can also be answered on Discord (or through the Matrix bridge).
-
-#### AI generated contributions:
-
-We ask that all code submitted is written and understood by a human. You can use AI for planning, designing, reviewing and for asking questions about the codebase, but the code itself needs to be written by you. As a small exception you can use intellisense-style AI code autocompletion for pure boilerplate code as long as it's only a small part of your submission. To further clarify, when we ask for "human written" that excludes letting an AI write the code and then paraphrasing it. In other words, we are asking for human effort.
-
-Why this policy exists:
-
-We have relatively low reviewing capacity and requiring human-written code increases the quality and trustworthyness of submitted pull requests. There are also general concerns with AI usage in emulation:
-- LLMs tend to make up solutions that work on the surface but are generally not accurate in the emulation sense
-- There is evidence that LLMs have been trained on leaked proprietary SDKs and we cannot verify the origin of the knowledge. This is especially a problem for core emulation logic
-
-Please keep these points in mind when contributing to Cemu. Contributions that do not follow this policy may be rejected.
+<!-- paste Ko-fi's button snippet here, or: -->
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H8L623H70U)
 
 ## License
 Cemu is licensed under [Mozilla Public License 2.0](/LICENSE.txt). Exempt from this are all files in the dependencies directory for which the licenses of the original code apply as well as some individual files in the src folder, as specified in those file headers respectively.
