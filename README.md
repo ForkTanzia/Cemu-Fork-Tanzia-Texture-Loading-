@@ -29,6 +29,9 @@ from its official source and run the converter yourself.
 3. Run `Cemu.exe` and set up your game as normal.
 4. Put your converted textures in `<Cemu>/load/textures/`.
 
+## Video demo featuring custom textures
+[![Custom Texture Demo](https://img.youtube.com/vi/nntnY9l1PAI/maxresdefault.jpg)](https://www.youtube.com/watch?v=nntnY9l1PAI)
+
 ## Building
 
 For compilation instructions, see [BUILD.md](BUILD.md).
