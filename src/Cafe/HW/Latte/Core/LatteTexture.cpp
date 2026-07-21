@@ -1155,6 +1155,49 @@ LatteTextureView* LatteTC_GetTextureSliceViewOrTryCreate(MPTR srcImagePtr, MPTR 
 	return LatteTexture_CreateMapping(srcImagePtr, srcMipPtr, srcWidth, srcHeight, srcDepth, srcPitch, srcTileMode, srcSwizzle, srcMip, 1, srcSlice, 1, srcFormat, srcDepth > 1 ? Latte::E_DIM::DIM_2D_ARRAY : Latte::E_DIM::DIM_2D, Latte::E_DIM::DIM_2D, false, false);
 }
 
+
+// [texture replacement] Rebuild ONE texture so the creation-time auto-overwrite runs again with
+// now-settled guest data. Modeled on LatteTexture_RecreateTextureWithDifferentMipSliceCount but
+// keeps identical parameters. Recreating a single texture avoids the full-flush screen blink.
+static void LatteTexture_RecreateForReplacement(LatteTexture* texture)
+{
+	LatteTextureView* view = LatteTexture_CreateTexture(texture->dim, texture->physAddress, texture->physMipAddress, texture->format, texture->width, texture->height, texture->depth, texture->pitch, texture->mipLevels, texture->swizzle, texture->tileMode, texture->isDepth);
+	if (texture->isUpdatedOnGPU)
+	{
+		LatteTexture_copyData(texture, view->baseTexture, texture->mipLevels, texture->depth);
+		view->baseTexture->isUpdatedOnGPU = true;
+	}
+	LatteTexture_Delete(texture);
+	LatteTexture_GatherTextureRelations(view->baseTexture);
+	LatteTexture_UpdateTextureFromDynamicChanges(view->baseTexture);
+	LatteTexture_DeleteAbsorbedSubtextures(view->baseTexture);
+}
+
+// [texture replacement] Periodically re-check textures that missed their replacement at creation
+// (dynamic textures whose guest data settled after creation, e.g. newly-equipped weapons). Runs at
+// a safe GPU-thread boundary. Recreates at most one texture per call to stay safe.
+void LatteTexture_RecheckReplacements()
+{
+	// Recreate any texture flagged as stale (Hook 2 found a replacement whose size didn't match the
+	// host -- caused by a reused texture object carrying a stale overwrite). Recreating makes it a
+	// fresh load, so the loader's authoritative-hash correction sizes it right. One per pass = safe.
+	if (!LatteTextureReplace::IsEnabled())
+		return;
+	std::vector<LatteTexture*> allCopy = LatteTexture::GetAllTextures();
+	uint32 flaggedCount = 0;
+	for (auto tex : allCopy)
+	{
+		if (tex && tex->needsReplRecreate)
+		{
+			flaggedCount++;
+			tex->needsReplRecreate = false;
+			LatteTexture_RecreateForReplacement(tex);
+			return;
+		}
+	}
+	static uint32 _rlast=0;
+}
+
 void LatteTexture_UpdateDataToLatest(LatteTexture* texture)
 {
 	if (LatteTC_HasTextureChanged(texture))

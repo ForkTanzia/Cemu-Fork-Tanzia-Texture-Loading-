@@ -151,6 +151,9 @@ public:
 	uint32 texDataHash2{};
 	// state
 	bool isUpdatedOnGPU{ false }; // set if any GPU-side operation modified this texture and strict one-way RAM->VRAM memory mirroring no longer applies
+	bool replGaveUp{ false };     // [texture replacement] stop re-checking this texture for a late replacement
+	bool needsReplRecreate{ false }; // [texture replacement] stale overwrite detected -> recreate to fix size
+	uint16 replRecheckCount{ 0 }; // [texture replacement] how many times we've re-checked for a replacement
 	bool enableReadback{ false }; // if true, texture will be mirrored back to CPU RAM under specific circumstances
 	// invalidation
 	bool forceInvalidate{};
@@ -362,4 +365,5 @@ void LatteTexture_MarkDynamicTextureAsChanged(LatteTextureView* textureView, sin
 void LatteTexture_UpdateTextureFromDynamicChanges(LatteTexture* texture);
 
 void LatteTexture_UpdateDataToLatest(LatteTexture* texture);
+void LatteTexture_RecheckReplacements(); // [texture replacement] surgical late-match recreate
 uint32 LatteTexture_HashData(const uint8* dataPtr, uint32 memRange, uint32 pixelCount, bool isCompressedFormat, bool useLightHash);

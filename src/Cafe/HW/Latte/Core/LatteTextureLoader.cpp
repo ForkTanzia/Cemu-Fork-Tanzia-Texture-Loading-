@@ -592,7 +592,7 @@ void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint
 	}
 	cemu_assert_debug(mipLevels == hostTexture->mipLevels);
 	const bool overwritten = hostTexture->overwriteInfo.hasResolutionOverwrite || hostTexture->overwriteInfo.hasFormatOverwrite;
-	if (overwritten && LatteTextureReplace::IsEnabled())
+	if (overwritten && LatteTextureReplace::IsEnabled() && Latte::IsCompressedFormat(hostTexture->format))
 	{
 		const LatteTextureReplace_Entry* slice = LatteTextureReplace::GetSlice(hostTexture->texDataHash2, mipIndex);
 		if (slice)
@@ -603,6 +603,10 @@ void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint
 			{
 				g_renderer->texture_loadSlice(hostTexture, hostW, hostH, depth, slice->data, sliceIndex, mipIndex, slice->dataSize);
 				return;
+			}
+			if (slice->isCompressed) // compressed slice found but size != host -> stale overwrite on a reused texture; flag for recreation
+			{
+				hostTexture->needsReplRecreate = true;
 			}
 			if (!slice->isCompressed)
 			{
@@ -618,7 +622,6 @@ void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint
 	}
 	if (overwritten)
 	{
-		// todo - ideally, we should scale/convert the data to the new format and resolution
 		g_renderer->texture_clearSlice(hostTexture, sliceIndex, mipIndex);
 	}
 	else
@@ -647,6 +650,34 @@ void LatteTextureLoader_UpdateTextureSliceData(LatteTexture* tex, uint32 sliceIn
 	TextureDecoder* texDecoder = nullptr;
 	texDecoder = g_renderer->texture_chooseDecodedFormat(format, tex->isDepth, dim, width, height);
 
+	// [texture replacement] Decide the auto-overwrite HERE, from the real loaded base data, BEFORE
+	// AllocateOnHost. The constructor hook (Hook 1) can false-match on stale buffer contents left by a
+	// previously-equipped item, sizing the host wrong (e.g. 256 when the DDS is 512) which then blanks
+	// the texture. Recomputing here on the actual data fixes the size before the host is allocated.
+	if (tex->isDataDefined == false && LatteTextureReplace::IsEnabled() && Latte::IsCompressedFormat(format))
+	{
+		// use Cemu's authoritative hash (the one that names the DDS and drives GetSlice), computed
+		// on the real loaded data -- NOT our own HashGuess, which diverges for some textures.
+		tex->texDataPtrLow  = physImagePtr + textureLoader.minOffsetOutdated;
+		tex->texDataPtrHigh = physImagePtr + textureLoader.maxOffsetOutdated;
+		uint32 _h = LatteTexture_CalculateTextureDataHash(tex);
+		LatteTextureReplace::ReplacementInfo _ri;
+		if (LatteTextureReplace::GetInfo(_h, _ri))
+		{
+			if (_ri.width != tex->overwriteInfo.width || _ri.height != tex->overwriteInfo.height)
+			tex->overwriteInfo.hasResolutionOverwrite = true;
+			tex->overwriteInfo.width = _ri.width;
+			tex->overwriteInfo.height = _ri.height;
+			tex->overwriteInfo.depth = tex->depth;
+			if (_ri.hasFormat && _ri.gx2Format != (uint32)format) { tex->overwriteInfo.hasFormatOverwrite = true; tex->overwriteInfo.format = (sint32)_ri.gx2Format; }
+		}
+		else if (tex->overwriteInfo.hasResolutionOverwrite && Latte::IsCompressedFormat(format))
+		{
+			// Hook 1 false-matched on stale data but the real texture has no replacement -> undo it (render vanilla, not blank)
+			tex->overwriteInfo.hasResolutionOverwrite = false;
+			tex->overwriteInfo.hasFormatOverwrite = false;
+		}
+	}
 	if (tex->isDataDefined == false)
 	{
 		tex->AllocateOnHost();

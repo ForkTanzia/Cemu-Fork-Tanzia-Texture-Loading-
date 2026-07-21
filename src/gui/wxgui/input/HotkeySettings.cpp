@@ -1,5 +1,6 @@
 #include "wxgui/input/HotkeySettings.h"
 #include "Cafe/HW/Latte/Renderer/Renderer.h"
+#include "Cafe/HW/Latte/Core/LatteAsyncCommands.h"
 #include "interface/WindowSystem.h"
 #include <config/ActiveSettings.h>
 #include "input/InputManager.h"
@@ -157,6 +158,7 @@ HotkeySettings::HotkeySettings(wxWindow* parent)
 	/* hotkeys */
 	CreateHotkeyRow(_tr("Toggle fullscreen"), s_cfgHotkeys.toggleFullscreen);
 	CreateHotkeyRow(_tr("Take screenshot"), s_cfgHotkeys.takeScreenshot);
+	CreateHotkeyRow(_tr("Reload textures"), s_cfgHotkeys.reloadTextures);
 	CreateHotkeyRow(_tr("Toggle fast-forward"), s_cfgHotkeys.toggleFastForward);
 #ifdef CEMU_DEBUG_ASSERT
 	CreateHotkeyRow(_tr("End emulation"), s_cfgHotkeys.endEmulation);
@@ -193,6 +195,9 @@ void HotkeySettings::Init(MainWindow* mainWindowFrame)
 		{&s_cfgHotkeys.takeScreenshot, [](void) {
 			 if (g_renderer)
 				 g_renderer->RequestScreenshot(SaveScreenshot);
+		 }},
+		{&s_cfgHotkeys.reloadTextures, [](void) {
+			 LatteAsyncCommands_queueReloadTextures();
 		 }},
 		{&s_cfgHotkeys.toggleFastForward, [](void) {
 			 ActiveSettings::SetTimerShiftFactor((ActiveSettings::GetTimerShiftFactor() < 3) ? 3 : 1);

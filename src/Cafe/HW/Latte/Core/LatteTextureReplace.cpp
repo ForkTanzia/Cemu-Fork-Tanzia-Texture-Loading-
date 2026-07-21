@@ -115,13 +115,13 @@ namespace LatteTextureReplace
 		if(s_skipMip && mipIndex!=0) return nullptr;
 		auto it=s_index.find(contentHash); if(it==s_index.end()) return nullptr;
 		HashGroup& g=it->second;
-		if(auto d=g.decoded.find(mipIndex); d!=g.decoded.end()) return d->second.data?&d->second:nullptr;
+		if(auto d=g.decoded.find(mipIndex); d!=g.decoded.end() && d->second.data) return &d->second; // trust only cache hits with real data; never cache misses
 		// Prefer the base (mip0) file and pull this level from its internal DDS mip chain, so a
 		// single mip00 DDS with a full chain serves every mip level (no per-mip copies needed).
 		int internalMip = mipIndex;
 		auto f=g.mips.find(0);
 		if(f==g.mips.end()){ f=g.mips.find(mipIndex); internalMip=0; }
-		if(f==g.mips.end()){ g.decoded[mipIndex]={}; return nullptr; }
+		if(f==g.mips.end()){ return nullptr; } // don't cache the miss -> allow retry
 		LatteTextureReplace_Entry ent;
 		if(f->second.isDDS){
 			std::ifstream in(f->second.path,std::ios::binary);
@@ -139,8 +139,8 @@ namespace LatteTextureReplace
 			int w,h,comp; uint8_t* rgba=stbi_load(f->second.path.string().c_str(),&w,&h,&comp,4);
 			if(rgba){ ent.data=rgba; ent.width=w; ent.height=h; ent.dataSize=(uint32_t)w*h*4; ent.isCompressed=false; }
 		}
-		if(!ent.data) cemuLog_log(LogType::Force,"[TextureReplace] load failed: {}",f->second.path.string());
+		if(!ent.data){ cemuLog_log(LogType::Force,"[TextureReplace] load failed: {}",f->second.path.string()); return nullptr; } // don't cache failure -> allow retry
 		g.decoded[mipIndex]=ent;
-		return ent.data?&g.decoded[mipIndex]:nullptr;
+		return &g.decoded[mipIndex];
 	}
 }
