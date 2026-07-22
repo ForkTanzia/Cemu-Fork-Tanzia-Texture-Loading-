@@ -8,7 +8,10 @@
 This is a fork that allows you to load custom textures, including upscale textures, on Cemu. 
 The fork adds **runtime custom-texture loading** - much like 3DS emulators - which allows
 for custom textures to load . While it is built with MH3U in mind, it could work for other
-games too.
+games too. Textures are matched automatically as they load. In rare cases (e.g. swapping equipment),
+a texture may briefly appear vanilla/blank for half a second before the correct replacement is applied — this
+resolves itself within about half a second. No action needed. If in any case a texture does bug out you can press
+"F6" (Can be rebound in hotkey settings) to manually reload the textures.
 
 Alongside it, there's a separate tool that converts textures from **NGRP by raccu** (an HD
 texture project for the *3DS* version of MH3U) into a form the Wii U version can use.
@@ -22,6 +25,7 @@ from its official source and run the converter yourself.
   replacement itself (no graphic-pack rules needed).
 - Supported: DDS (BC1–BC5, with mipmaps) and PNG/TGA.
 - Custom-texture loading is enabled by default in this build.
+- Press F6 (can be changed in hotkey settings) to reload all textures. This is mostly for if textures bug out for any reason.
 
 ## Download & run (ready-to-use build)
 1. Go to the [Releases](../../releases) page and download the latest build.
