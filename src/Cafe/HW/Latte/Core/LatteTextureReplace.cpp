@@ -14,7 +14,6 @@
 
 namespace fs = std::filesystem;
 
-extern uint32 LatteTexture_HashData(const uint8* dataPtr, uint32 memRange, uint32 pixelCount, bool isCompressedFormat, bool useLightHash);
 
 namespace LatteTextureReplace
 {
@@ -42,14 +41,14 @@ namespace LatteTextureReplace
 	struct HashGroup { std::unordered_map<int,FileRef> mips; std::unordered_map<int,LatteTextureReplace_Entry> decoded; };
 
 	static std::mutex s_mutex;
-	static std::unordered_map<uint32_t,HashGroup> s_index;
+	static std::unordered_map<uint64_t,HashGroup> s_index;
 	static bool s_enabled=false, s_flip=false, s_skipMip=false, s_initDone=false, s_wantEnabled=false;
 	static uint64_t s_title=0;
 
-	static bool parseName(const std::string& n,uint32_t& hash,int& w,int& h,int& mip){
-		unsigned uHash=0,uFmt=0; int uW=0,uH=0,uMip=0;
-		if (sscanf(n.c_str(),"%x_%dx%d_fmt%x_mip%d",&uHash,&uW,&uH,&uFmt,&uMip)!=5) return false;
-		hash=uHash; w=uW; h=uH; mip=uMip; return true;
+	static bool parseName(const std::string& n,uint64_t& hash,int& w,int& h,int& mip){
+		unsigned long long uHash=0; unsigned uFmt=0; int uW=0,uH=0,uMip=0;
+		if (sscanf(n.c_str(),"%llx_%dx%d_fmt%x_mip%d",&uHash,&uW,&uH,&uFmt,&uMip)!=5) return false;
+		hash=(uint64_t)uHash; w=uW; h=uH; mip=uMip; return true;
 	}
 	static void loadPackConfig(const fs::path& base){
 		std::ifstream f(base/"pack.json"); if(!f) return;
@@ -79,7 +78,7 @@ namespace LatteTextureReplace
 			std::string ext=e.path().extension().string(); for(auto& c:ext) c=(char)tolower(c);
 			bool dds=(ext==".dds"), img=(ext==".png"||ext==".tga");
 			if(!dds && !img) continue;
-			uint32_t hash; int w,h,mip;
+			uint64_t hash; int w,h,mip;
 			if(!parseName(e.path().filename().string(),hash,w,h,mip)) continue;
 			if(s_skipMip && mip!=0) continue;
 			FileRef ref{e.path(),w,h,dds,0};
@@ -93,14 +92,39 @@ namespace LatteTextureReplace
 
 	bool IsEnabled(){ std::scoped_lock lock(s_mutex); EnsureInit(); return s_enabled; }
 
-	uint32_t HashGuest(uint32_t physImagePtr, uint32_t sizeBytes, uint32_t pixelCount, Latte::E_GX2SURFFMT fmt){
+	// Full-data content hash. Every byte of the guest mip0 surface contributes, so distinct
+	// textures always get distinct hashes (unlike Cemu's 37-sample texDataHash2, which
+	// collides between e.g. monster subspecies built from the same base texture).
+	// Must stay bit-identical to strong_hash() in cemu_names.py.
+	uint64_t HashData(const uint8* p, uint32_t size){
+		uint64_t h = 0;
+		const uint32_t nWords = size / 8;
+		const uint64_t* w = (const uint64_t*)p;
+		for (uint32_t i = 0; i < nWords; i++)
+		{
+			uint64_t m = (w[i] ^ ((uint64_t)i * 0x9E3779B97F4A7C15ULL)) * 0xFF51AFD7ED558CCDULL;
+			m ^= m >> 29;
+			h ^= m;
+		}
+		for (uint32_t i = nWords * 8; i < size; i++)
+			h = (h ^ (uint64_t)p[i]) * 0x100000001B3ULL;
+		return h;
+	}
+
+	uint64_t HashGuest(uint32_t physImagePtr, uint32_t sizeBytes, uint32_t pixelCount, Latte::E_GX2SURFFMT fmt){
 		if(!s_enabled) { std::scoped_lock lock(s_mutex); EnsureInit(); if(!s_enabled) return 0; }
 		const uint8* p=(const uint8*)memory_getPointerFromPhysicalOffset(physImagePtr);
 		if(!p||!sizeBytes) return 0;
-		return LatteTexture_HashData(p, sizeBytes, pixelCount, Latte::IsCompressedFormat(fmt), false);
+		return HashData(p, sizeBytes);
 	}
 
-	bool GetInfo(uint32_t contentHash, ReplacementInfo& out){
+	uint64_t HashGuestRaw(uint32_t physImagePtr, uint32_t sizeBytes){
+		const uint8* p=(const uint8*)memory_getPointerFromPhysicalOffset(physImagePtr);
+		if(!p||!sizeBytes) return 0;
+		return HashData(p, sizeBytes);
+	}
+
+	bool GetInfo(uint64_t contentHash, ReplacementInfo& out){
 		std::scoped_lock lock(s_mutex); EnsureInit();
 		if(!s_enabled||contentHash==0) return false;
 		auto it=s_index.find(contentHash); if(it==s_index.end()) return false;
@@ -109,7 +133,7 @@ namespace LatteTextureReplace
 		out.hasFormat=m0->second.isDDS; out.gx2Format=m0->second.gx2Format; return true;
 	}
 
-	const LatteTextureReplace_Entry* GetSlice(uint32_t contentHash, int mipIndex){
+	const LatteTextureReplace_Entry* GetSlice(uint64_t contentHash, int mipIndex){
 		std::scoped_lock lock(s_mutex); EnsureInit();
 		if(!s_enabled) return nullptr;
 		if(s_skipMip && mipIndex!=0) return nullptr;

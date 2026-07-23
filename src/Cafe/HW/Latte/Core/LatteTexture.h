@@ -149,6 +149,7 @@ public:
 	MPTR texDataPtrLow{};
 	MPTR texDataPtrHigh{};
 	uint32 texDataHash2{};
+	uint64 replStrongHash{}; // [texture replacement] full-data content hash (our lookup key)
 	// state
 	bool isUpdatedOnGPU{ false }; // set if any GPU-side operation modified this texture and strict one-way RAM->VRAM memory mirroring no longer applies
 	bool replGaveUp{ false };     // [texture replacement] stop re-checking this texture for a late replacement

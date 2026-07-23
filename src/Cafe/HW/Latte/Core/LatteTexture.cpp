@@ -1356,7 +1356,7 @@ LatteTexture::LatteTexture(Latte::E_DIM dim, MPTR physAddress, MPTR physMipAddre
 	{
 		LatteAddrLib::AddrSurfaceInfo_OUT _replSI;
 		LatteAddrLib::GX2CalculateSurfaceInfo(format, width, height, depth, dim, Latte::MakeGX2TileMode(tileMode), 0, 0, &_replSI);
-		uint32 _replHash = LatteTextureReplace::HashGuest(this->physAddress, (uint32)_replSI.surfSize, width * height, format);
+		uint64 _replHash = LatteTextureReplace::HashGuest(this->physAddress, (uint32)_replSI.surfSize, width * height, format);
 		LatteTextureReplace::ReplacementInfo _ri;
 		if (LatteTextureReplace::GetInfo(_replHash, _ri))
 		{

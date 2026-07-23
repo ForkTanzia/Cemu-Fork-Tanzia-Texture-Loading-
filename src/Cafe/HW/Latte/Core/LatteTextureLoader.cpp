@@ -594,7 +594,7 @@ void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint
 	const bool overwritten = hostTexture->overwriteInfo.hasResolutionOverwrite || hostTexture->overwriteInfo.hasFormatOverwrite;
 	if (overwritten && LatteTextureReplace::IsEnabled() && Latte::IsCompressedFormat(hostTexture->format))
 	{
-		const LatteTextureReplace_Entry* slice = LatteTextureReplace::GetSlice(hostTexture->texDataHash2, mipIndex);
+		const LatteTextureReplace_Entry* slice = LatteTextureReplace::GetSlice(hostTexture->replStrongHash, mipIndex);
 		if (slice)
 		{
 			sint32 hostW = std::max<sint32>(1, (hostTexture->overwriteInfo.hasResolutionOverwrite ? hostTexture->overwriteInfo.width  : hostTexture->width)  >> mipIndex);
@@ -613,7 +613,7 @@ void LatteTextureLoader_loadTextureDataIntoSlice(LatteTexture* hostTexture, sint
 				const uint8* rgba = slice->data; std::vector<uint8> tmp;
 				if (slice->width != hostW || slice->height != hostH)
 				{
-					const LatteTextureReplace_Entry* m0 = LatteTextureReplace::GetSlice(hostTexture->texDataHash2, 0);
+					const LatteTextureReplace_Entry* m0 = LatteTextureReplace::GetSlice(hostTexture->replStrongHash, 0);
 					if (m0 && !m0->isCompressed) { tmp.resize((size_t)hostW*hostH*4); _downsampleRGBA_repl(m0->data, m0->width, m0->height, tmp.data(), hostW, hostH); rgba = tmp.data(); }
 				}
 				if (rgba) { g_renderer->texture_loadSlice(hostTexture, hostW, hostH, depth, (void*)rgba, sliceIndex, mipIndex, hostW*hostH*4); return; }
@@ -654,17 +654,21 @@ void LatteTextureLoader_UpdateTextureSliceData(LatteTexture* tex, uint32 sliceIn
 	// AllocateOnHost. The constructor hook (Hook 1) can false-match on stale buffer contents left by a
 	// previously-equipped item, sizing the host wrong (e.g. 256 when the DDS is 512) which then blanks
 	// the texture. Recomputing here on the actual data fixes the size before the host is allocated.
+	// Our own full-data content hash of the mip0 surface. Recomputed on every load so a reused
+	// texture object never carries a stale key. Cemu's texDataHash2 is NOT usable here: it samples
+	// only ~296 bytes and collides between distinct textures (e.g. monster subspecies).
+	if (mipIndex == 0 && sliceIndex == 0 && LatteTextureReplace::IsEnabled() && Latte::IsCompressedFormat(format))
+		tex->replStrongHash = LatteTextureReplace::HashGuest(physImagePtr, (uint32)textureLoader.maxOffsetOutdated, tex->width * tex->height, format);
+
 	if (tex->isDataDefined == false && LatteTextureReplace::IsEnabled() && Latte::IsCompressedFormat(format))
 	{
-		// use Cemu's authoritative hash (the one that names the DDS and drives GetSlice), computed
-		// on the real loaded data -- NOT our own HashGuess, which diverges for some textures.
+		// size the host from the replacement BEFORE AllocateOnHost -- the constructor hook can
+		// false-match on stale buffer contents left by a previously-equipped item.
 		tex->texDataPtrLow  = physImagePtr + textureLoader.minOffsetOutdated;
 		tex->texDataPtrHigh = physImagePtr + textureLoader.maxOffsetOutdated;
-		uint32 _h = LatteTexture_CalculateTextureDataHash(tex);
 		LatteTextureReplace::ReplacementInfo _ri;
-		if (LatteTextureReplace::GetInfo(_h, _ri))
+		if (LatteTextureReplace::GetInfo(tex->replStrongHash, _ri))
 		{
-			if (_ri.width != tex->overwriteInfo.width || _ri.height != tex->overwriteInfo.height)
 			tex->overwriteInfo.hasResolutionOverwrite = true;
 			tex->overwriteInfo.width = _ri.width;
 			tex->overwriteInfo.height = _ri.height;
@@ -754,8 +758,11 @@ void LatteTextureLoader_UpdateTextureSliceData(LatteTexture* tex, uint32 sliceIn
 	if (textureLoader.dump)
 	{
 		fs::path path = ActiveSettings::GetUserDataPath("dump/textures");
-		uint32 texHashForDump = LatteTexture_CalculateTextureDataHash(tex);
-		path /= fmt::format("{:08x}_{:d}x{:d}_fmt{:04x}_mip{:02d}.tga", texHashForDump, tex->width, tex->height, (uint32)tex->format, mipIndex);
+		// dump with the same key the loader matches on, so a dumped name can be reused verbatim
+		uint64 texHashForDump = tex->replStrongHash;
+		if (texHashForDump == 0)
+			texHashForDump = LatteTextureReplace::HashGuestRaw(physImagePtr, (uint32)textureLoader.maxOffsetOutdated);
+		path /= fmt::format("{:016x}_{:d}x{:d}_fmt{:04x}_mip{:02d}.tga", texHashForDump, tex->width, tex->height, (uint32)tex->format, mipIndex);
 		tga_write_rgba(path, textureLoader.width, textureLoader.height, textureLoader.dumpRGBA);
 		free(textureLoader.dumpRGBA);
 	}
