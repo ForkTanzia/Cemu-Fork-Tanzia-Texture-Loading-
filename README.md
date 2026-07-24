@@ -40,6 +40,10 @@ from its official source and run the converter yourself.
 
 For compilation instructions, see [BUILD.md](BUILD.md).
 
+
+## Video tutorial for texture conversion (Click)
+[![Tutorial](https://img.youtube.com/vi/9_LOyT8EYF8/maxresdefault.jpg)](https://www.youtube.com/watch?v=9_LOyT8EYF8)
+
 ## Credits
 - **Cemu** by the Cemu project — https://github.com/cemu-project/Cemu (MPL-2.0)
 - **NGRP** HD texture project by **raccu** — https://www.raccu.com/releases/runtime/mh3u-3g/
