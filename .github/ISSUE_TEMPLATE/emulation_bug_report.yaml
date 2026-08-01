@@ -1,6 +1,6 @@
 # Docs - https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-githubs-form-schema
 name: Bug Report
-description: Report an issue with Cemu emulator
+description: Report an issue with this fork
 title: "Enter a title for the bug report here"
 labels: bug
 body:
@@ -9,14 +9,23 @@ body:
     attributes:
       value: |
         ## Important: Read First
-        
-        If you discovered a bug you can report it here. Please make sure of the following first:
-        - That you are using the latest version of Cemu
-        - Only report something if you are sure it's a bug and not any technical issue on your end. For troubleshooting help see the [links page](https://github.com/cemu-project/Cemu#links)
-        - Problems specific to a single game should be reported on the [compatibility wiki](https://wiki.cemu.info/wiki/Main_Page) instead
-        - Verify that your problem isn't already mentioned on the [issue tracker](https://github.com/cemu-project/Cemu/issues)
-        
-        Additionally, be aware that graphic packs can also causes issues. There is a separate issue tracker for graphic pack bugs over at the [graphic pack repository](https://github.com/cemu-project/cemu_graphic_packs)
+
+        This tracker is for bugs in **this fork** — mainly the custom texture loading it adds.
+        Before reporting, please check:
+
+        - **Does it also happen on stock Cemu?** If yes, report it to the
+          [Cemu project](https://github.com/cemu-project/Cemu/issues) instead — it isn't
+          something this fork introduced.
+        - **Does it still happen with an empty `load/textures/` folder?** Rename the folder
+          and try again. This is the quickest way to tell whether texture loading is involved,
+          and it's the first thing I'll ask.
+        - **Have you tried pressing F6?** That reloads all textures and clears most temporary
+          texture glitches. Please still report it if F6 fixes it — that's useful information,
+          not a reason to stay quiet.
+        - Check the existing [issues](../../issues) in case it's already known.
+
+        Graphic packs can also cause problems. If you're running any, try disabling them before
+        reporting.
   - type: textarea
     id: current_behavior
     attributes:
@@ -31,7 +40,6 @@ body:
       description: "What did you expect to happen?"
     validations:
       required: true
-
   - type: textarea
     id: steps_to_reproduce
     attributes:
@@ -39,14 +47,42 @@ body:
       description: "How to reproduce the issue"
     validations:
       required: true
+  - type: dropdown
+    id: without_textures
+    attributes:
+      label: Does it happen with an empty load/textures folder?
+      description: "Rename your load/textures folder and try again. This tells us whether texture loading is involved at all."
+      options:
+        - "Yes — it still happens without any custom textures"
+        - "No — it only happens with custom textures loaded"
+        - "Haven't tested"
+    validations:
+      required: true
+  - type: dropdown
+    id: f6_reload
+    attributes:
+      label: Does pressing F6 (reload textures) fix it?
+      options:
+        - "Yes — F6 clears it"
+        - "No — it persists after F6"
+        - "Not a texture issue / not applicable"
+    validations:
+      required: false
+  - type: textarea
+    id: texture_details
+    attributes:
+      label: "Texture details (Optional)"
+      description: |
+        If it's a texture problem: what does the affected texture look like (blank, black, wrong texture, low resolution)? Does it change with camera distance? If you can dump it (Debug > Dump > Textures), the filename is very helpful.
+    validations:
+      required: false
   - type: textarea
     id: sys_info
     attributes:
       label: System Info (Optional)
-      description: "Your PC specifications. Usually only the operating system and graphics card is important. But feel free to add more info."
+      description: "Your PC specifications. Usually only the operating system and graphics card matter, but feel free to add more."
       placeholder: |
-        Info        
-        OS: Windows 10
+        OS: Windows 11
         GPU: NVIDIA GeForce RTX 4090
       value: |
         OS: 
@@ -56,7 +92,7 @@ body:
     attributes:
       label: Emulation Settings (Optional)
       description: |
-        Any non-default settings. You can leave this empty if you didn't change anything other than input settings.
+        Any non-default settings, and any graphic packs you have enabled.
     validations:
       required: false
   - type: textarea
@@ -64,6 +100,6 @@ body:
     attributes:
       label: "Logs (Optional)"
       description: |
-        "Attach `log.txt` from your Cemu folder (*File > Open Cemu folder*)".
+        Attach `log.txt` from your Cemu folder (*File > Open Cemu folder*). Lines containing `[TextureReplace]` are especially useful.
     validations:
       required: false
