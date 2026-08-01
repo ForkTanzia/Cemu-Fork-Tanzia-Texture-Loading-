@@ -1,5 +1,8 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
+  - name: Cemu (upstream project)
+    url: https://github.com/cemu-project/Cemu/issues
+    about: For bugs or requests that also happen on stock Cemu and aren't related to this fork's texture loading, report them upstream instead.
   - name: Cemu Discord
     url: https://discord.com/invite/5psYsup
-    about: If you need technical support with Cemu or have other questions the best place to ask is on the official Cemu Discord linked here
+    about: For general Cemu technical support unrelated to this fork.
