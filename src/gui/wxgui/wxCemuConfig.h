@@ -3,6 +3,8 @@
 #include "config/XMLConfig.h"
 #include "util/math/vector2.h"
 
+#include <map>
+
 #include "wxgui.h"
 
 namespace DefaultColumnSize
@@ -85,6 +87,15 @@ struct wxCemuConfig
 	std::vector<std::string> recent_launch_files;
 	std::vector<std::string> recent_nfc_files;
 
+	// custom textures, per title. A title with no entry here has never been configured and
+	// defaults to "enabled, all packs" so a freshly dropped-in pack works without setup.
+	struct CustomTextureTitleSettings
+	{
+		bool enabled = true;
+		std::vector<std::string> packs;
+	};
+	std::map<uint64, CustomTextureTitleSettings> custom_textures;
+
 	Vector2i window_position{-1, -1};
 	Vector2i window_size{-1, -1};
 	ConfigValue<bool> window_maximized;
@@ -125,6 +136,7 @@ struct wxCemuConfig
 		sHotkeyCfg toggleFullscreenAlt;
 		sHotkeyCfg exitFullscreen;
 		sHotkeyCfg takeScreenshot;
+		sHotkeyCfg reloadTextures;
 		sHotkeyCfg toggleFastForward;
 		sHotkeyCfg exitApplication;
 #ifdef CEMU_DEBUG_ASSERT

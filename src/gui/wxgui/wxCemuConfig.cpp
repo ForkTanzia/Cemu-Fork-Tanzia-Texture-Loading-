@@ -107,6 +107,31 @@ void wxCemuConfig::Load(XMLConfigParser& parser)
 		}
 	}
 
+	// custom textures: flat "<titleId>|<key>|<value>" entries, since '|' can't appear in a
+	// Windows folder name and the XML helper only stores plain string values
+	custom_textures.clear();
+	auto texture_parser = parser.get("CustomTextures");
+	for (auto element = texture_parser.get("Entry"); element.valid(); element = texture_parser.get("Entry", element))
+	{
+		const std::string entry = element.value("");
+		const size_t sep1 = entry.find('|');
+		if (sep1 == std::string::npos)
+			continue;
+		const size_t sep2 = entry.find('|', sep1 + 1);
+		if (sep2 == std::string::npos)
+			continue;
+		uint64 titleId = 0;
+		try { titleId = std::stoull(entry.substr(0, sep1), nullptr, 16); }
+		catch (const std::exception&) { continue; }
+		const std::string key = entry.substr(sep1 + 1, sep2 - sep1 - 1);
+		const std::string value = entry.substr(sep2 + 1);
+		auto& settings = custom_textures[titleId];
+		if (key == "enabled")
+			settings.enabled = (value != "0");
+		else if (key == "pack" && !value.empty())
+			settings.packs.emplace_back(value);
+	}
+
 	// hotkeys
 	auto xml_hotkeys = parser.get("Hotkeys");
 	hotkeys.modifiers = xml_hotkeys.get("modifiers", sHotkeyCfg{});
@@ -114,6 +139,7 @@ void wxCemuConfig::Load(XMLConfigParser& parser)
 	hotkeys.toggleFullscreen = xml_hotkeys.get("ToggleFullscreen", sHotkeyCfg{uKeyboardHotkey{WXK_F11}});
 	hotkeys.toggleFullscreenAlt = xml_hotkeys.get("ToggleFullscreenAlt", sHotkeyCfg{uKeyboardHotkey{WXK_CONTROL_M, true}}); // ALT+ENTER
 	hotkeys.takeScreenshot = xml_hotkeys.get("TakeScreenshot", sHotkeyCfg{uKeyboardHotkey{WXK_F12}});
+	hotkeys.reloadTextures = xml_hotkeys.get("ReloadTextures", sHotkeyCfg{uKeyboardHotkey{WXK_F6}});
 	hotkeys.toggleFastForward = xml_hotkeys.get("ToggleFastForward", sHotkeyCfg{});
 	hotkeys.exitApplication = xml_hotkeys.get("ExitApplication", sHotkeyCfg{});
 #ifdef CEMU_DEBUG_ASSERT
@@ -178,6 +204,20 @@ void wxCemuConfig::Save(XMLConfigParser& config)
 		nfc_files_parser.set("Entry", entry.c_str());
 	}
 
+	auto textures_parser = config.set("CustomTextures");
+	for (const auto& [titleId, settings] : custom_textures)
+	{
+		char prefix[24];
+		snprintf(prefix, sizeof(prefix), "%016llx", (unsigned long long)titleId);
+		const std::string enabledEntry = std::string(prefix) + "|enabled|" + (settings.enabled ? "1" : "0");
+		textures_parser.set("Entry", enabledEntry.c_str());
+		for (const auto& pack : settings.packs)
+		{
+			const std::string packEntry = std::string(prefix) + "|pack|" + pack;
+			textures_parser.set("Entry", packEntry.c_str());
+		}
+	}
+
 	// hotkeys
 	auto xml_hotkeys = config.set("Hotkeys");
 	xml_hotkeys.set("modifiers", hotkeys.modifiers);
@@ -185,6 +225,7 @@ void wxCemuConfig::Save(XMLConfigParser& config)
 	xml_hotkeys.set("ToggleFullscreen", hotkeys.toggleFullscreen);
 	xml_hotkeys.set("ToggleFullscreenAlt", hotkeys.toggleFullscreenAlt);
 	xml_hotkeys.set("TakeScreenshot", hotkeys.takeScreenshot);
+	xml_hotkeys.set("ReloadTextures", hotkeys.reloadTextures);
 	xml_hotkeys.set("ToggleFastForward", hotkeys.toggleFastForward);
 	xml_hotkeys.set("ExitApplication", hotkeys.exitApplication);
 }

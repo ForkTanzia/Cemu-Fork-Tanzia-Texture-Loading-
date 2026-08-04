@@ -6,6 +6,8 @@ add_library(CemuWxGui STATIC
   CemuUpdateWindow.h
   ChecksumTool.cpp
   ChecksumTool.h
+  CustomTexturesWindow.cpp
+  CustomTexturesWindow.h
   components/TextList.cpp
   components/TextList.h
   components/wxDownloadManagerList.cpp

@@ -196,6 +196,69 @@ uint32 LatteTexture_CalculateTextureDataHash(LatteTexture* hostTexture)
 	return hashVal;
 }
 
+// Standalone content hash over raw guest bytes. Mirrors the general path of
+// LatteTexture_CalculateTextureDataHash so a hash can be computed at texture creation
+// (before texDataPtr is set) for texture replacement. Matches for all compressed and
+// <=1200px uncompressed textures (the AVX2 huge-uncompressed path is not duplicated).
+uint32 LatteTexture_HashData(const uint8* dataPtr, uint32 memRange, uint32 pixelCount, bool isCompressedFormat, bool useLightHash)
+{
+	uint32* texDataU32 = (uint32*)dataPtr;
+	uint32 hashVal = 0;
+	if (isCompressedFormat || useLightHash)
+	{
+		if (memRange < 256)
+		{
+			memRange /= sizeof(uint32);
+			while (memRange--) { hashVal += *texDataU32; hashVal = (hashVal << 3) | (hashVal >> 29); texDataU32++; }
+		}
+		else
+			hashVal = _quickStochasticHash(texDataU32, memRange);
+		return hashVal;
+	}
+	if (pixelCount <= (700 * 700))
+	{
+		if (isCompressedFormat == false || memRange < 0x200)
+		{
+			memRange /= (4 * sizeof(uint32));
+			while (memRange--) { hashVal += *texDataU32; hashVal = (hashVal << 3) | (hashVal >> 29); texDataU32 += 4; }
+		}
+		else
+		{
+			memRange /= (32 * sizeof(uint32));
+			while (memRange--) { hashVal += *texDataU32; hashVal = (hashVal << 3) | (hashVal >> 29); texDataU32 += 32; }
+		}
+	}
+	else if (pixelCount <= (1200 * 1200))
+	{
+		if (isCompressedFormat == false)
+		{
+			memRange /= (12 * sizeof(uint32));
+			while (memRange--) { hashVal += *texDataU32; hashVal = (hashVal << 3) | (hashVal >> 29); texDataU32 += 12; }
+		}
+		else
+		{
+			memRange /= (96 * sizeof(uint32));
+			while (memRange--) { hashVal += *texDataU32; hashVal = (hashVal << 3) | (hashVal >> 29); texDataU32 += 96; }
+		}
+	}
+	else
+	{
+		if (isCompressedFormat == false)
+		{
+			memRange /= (32 * sizeof(uint64));
+			uint64 h64 = 0; uint64* texDataU64 = (uint64*)texDataU32;
+			while (memRange--) { h64 += *texDataU64; h64 = (h64 << 3) | (h64 >> 61); texDataU64 += 32; }
+			hashVal = (uint32)(h64 & 0xFFFFFFFF) + (uint32)(h64 >> 32);
+		}
+		else
+		{
+			memRange /= (512 * sizeof(uint32));
+			while (memRange--) { hashVal += *texDataU32; hashVal = (hashVal << 3) | (hashVal >> 29); texDataU32 += 512; }
+		}
+	}
+	return hashVal;
+}
+
 uint64 _botwLargeTexHax = 0;
 
 bool LatteTC_HasTextureChanged(LatteTexture* hostTexture, bool force)

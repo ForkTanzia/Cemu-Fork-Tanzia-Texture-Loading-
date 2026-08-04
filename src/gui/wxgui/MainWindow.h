@@ -148,6 +148,7 @@ public:
 private:
 	bool FullscreenEnabled() const;
 	void RecreateMenu();
+	void ApplyCustomTextureSettings();
 	void UpdateChildWindowTitleRunningState();
 	static wxString GetInitialWindowTitle();
 

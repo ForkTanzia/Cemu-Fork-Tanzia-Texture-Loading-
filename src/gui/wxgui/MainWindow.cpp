@@ -38,6 +38,7 @@
 #include "util/ScreenSaver/ScreenSaver.h"
 #include "util/helpers/SystemException.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/VsyncDriver.h"
+#include "Cafe/HW/Latte/Core/LatteTextureReplace.h"
 #if BOOST_OS_LINUX && defined(ENABLE_FERAL_GAMEMODE)
 #include <gamemode_client.h>
 #endif
@@ -304,6 +305,7 @@ MainWindow::MainWindow()
 	g_mainFrame = this;
 	CafeSystem::SetImplementation(this);
 
+	ApplyCustomTextureSettings();
 	RecreateMenu();
 	SetClientSize(1280, 720);
 	SetIcon(wxICON(M_WND_ICON128));
@@ -678,6 +680,17 @@ void MainWindow::OnFileMenu(wxCommandEvent& event)
 	{
 		EndEmulation();
 	}
+}
+
+// Push the saved per-title custom texture selection into the texture module before any game can
+// launch. Titles absent from the config are left alone: the module treats an unconfigured title
+// as "enabled, all packs", so dropping a pack into load/textures/<titleId>/ just works.
+// Edited from the game list context menu (see CustomTexturesWindow).
+void MainWindow::ApplyCustomTextureSettings()
+{
+	const auto& guiConfig = GetWxGUIConfig();
+	for (const auto& [titleId, settings] : guiConfig.custom_textures)
+		LatteTextureReplace::SetTitleSettings(titleId, settings.enabled, settings.packs);
 }
 
 void MainWindow::OnOpenFolder(wxCommandEvent& event)
