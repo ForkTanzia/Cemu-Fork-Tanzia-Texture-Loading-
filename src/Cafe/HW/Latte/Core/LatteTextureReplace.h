@@ -28,6 +28,10 @@ struct LatteTextureReplace_Entry
 namespace LatteTextureReplace
 {
 	bool IsEnabled();
+	// Uncompressed guest formats a replacement may target. RGBA8 only, which is what the UI sheets
+	// use; this keeps the expensive full-surface hash off depth buffers and the single/dual channel
+	// render target formats.
+	bool IsReplaceableUncompressed(Latte::E_GX2SURFFMT format);
 	const LatteTextureReplace_Entry* GetSlice(uint64_t contentHash, int mipIndex);
 
 	// size/format of the replacement, used to size the host texture (no [TextureRedefine] needed)

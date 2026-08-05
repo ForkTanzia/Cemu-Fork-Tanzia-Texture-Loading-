@@ -18,7 +18,8 @@ namespace fs = std::filesystem;
 
 namespace LatteTextureReplace
 {
-	struct DDSInfo { uint32_t gx2Format=0; int bytesPerBlock=0; int width=0, height=0, mipCount=1; uint32_t dataOffset=0; bool ok=false; };
+	// bytesPerBlock is per 4x4 block for the BCn formats and per pixel for the uncompressed one
+	struct DDSInfo { uint32_t gx2Format=0; int bytesPerBlock=0; int width=0, height=0, mipCount=1; uint32_t dataOffset=0; bool ok=false; bool blockCompressed=true; };
 	static uint32_t rd32(const uint8_t* p){ return p[0]|(p[1]<<8)|(p[2]<<16)|((uint32_t)p[3]<<24); }
 	static DDSInfo ddsParseHeader(const uint8_t* d, size_t n)
 	{
@@ -29,14 +30,37 @@ namespace LatteTextureReplace
 		auto FCC=[](const char* s){ return (uint32_t)((uint8_t)s[0]|((uint8_t)s[1]<<8)|((uint8_t)s[2]<<16)|((uint32_t)(uint8_t)s[3]<<24)); };
 		if (fourcc == FCC("DX10")) { if (n < 148) return r; dxgi = rd32(d+128); r.dataOffset = 148; }
 		auto set=[&](uint32_t gx2,int bpb){ r.gx2Format=gx2; r.bytesPerBlock=bpb; r.ok=true; };
+		// Uncompressed 32-bit DDS. Supported so that an RGBA8 guest texture can be replaced without
+		// a format overwrite: the replacement is already the format the texture is in, so the host
+		// texture needs no redefinition at all.
+		if (fourcc==0)
+		{
+			uint32_t pfFlags=rd32(d+80), bitCount=rd32(d+88);
+			uint32_t rMask=rd32(d+92), gMask=rd32(d+96), bMask=rd32(d+100), aMask=rd32(d+104);
+			const bool hasRGB=(pfFlags&0x40)!=0, hasAlpha=(pfFlags&0x1)!=0;
+			if (hasRGB && hasAlpha && bitCount==32 &&
+				rMask==0x000000FF && gMask==0x0000FF00 && bMask==0x00FF0000 && aMask==0xFF000000)
+			{
+				set(0x01a, 4);
+				r.blockCompressed=false;
+				return r;
+			}
+			return r; // some other uncompressed layout -- not supported, and refused rather than guessed at
+		}
 		if      (fourcc==FCC("DXT1") || dxgi==70||dxgi==71||dxgi==72) set(0x031, 8);
 		else if (fourcc==FCC("DXT3") || dxgi==73||dxgi==74||dxgi==75) set(0x032, 16);
 		else if (fourcc==FCC("DXT5") || dxgi==76||dxgi==77||dxgi==78) set(0x033, 16);
 		else if (fourcc==FCC("ATI1") || fourcc==FCC("BC4U") || dxgi==80||dxgi==81) set(0x034, 8);
 		else if (fourcc==FCC("ATI2") || fourcc==FCC("BC5U") || dxgi==83||dxgi==84) set(0x035, 16);
+		// DXGI_FORMAT_R8G8B8A8_UNORM / _UNORM_SRGB, written when a converter uses a DX10 header
+		else if (dxgi==28) { set(0x01a, 4); r.blockCompressed=false; }
+		else if (dxgi==29) { set(0x41a, 4); r.blockCompressed=false; }
 		return r;
 	}
-	static uint32_t mipByteSize(int w,int h,int bpb){ return (uint32_t)((std::max(1,(w+3)/4))*(std::max(1,(h+3)/4))*bpb); }
+	static uint32_t mipByteSize(int w,int h,int bpb,bool blockCompressed=true){
+		if(!blockCompressed) return (uint32_t)(std::max(1,w)*std::max(1,h)*bpb);
+		return (uint32_t)((std::max(1,(w+3)/4))*(std::max(1,(h+3)/4))*bpb);
+	}
 
 	struct FileRef { fs::path path; int width=0, height=0; uint32_t gx2Format=0; bool probed=false; std::string pack; };
 	struct HashGroup { std::unordered_map<int,FileRef> mips; std::unordered_map<int,LatteTextureReplace_Entry> decoded; };
@@ -166,6 +190,12 @@ namespace LatteTextureReplace
 
 	bool IsEnabled(){ std::scoped_lock lock(s_mutex); EnsureInit(); return s_enabled; }
 
+	bool IsReplaceableUncompressed(Latte::E_GX2SURFFMT format)
+	{
+		return format == Latte::E_GX2SURFFMT::R8_G8_B8_A8_UNORM
+			|| format == Latte::E_GX2SURFFMT::R8_G8_B8_A8_SRGB;
+	}
+
 	// Full-data content hash. Every byte of the guest mip0 surface contributes, so distinct
 	// textures always get distinct hashes (unlike Cemu's 37-sample texDataHash2, which
 	// collides between e.g. monster subspecies built from the same base texture).
@@ -249,7 +279,7 @@ namespace LatteTextureReplace
 			ref.gx2Format=di.gx2Format; ref.width=di.width; ref.height=di.height; ref.probed=true; // free probe
 			uint32_t off=di.dataOffset; int w=di.width,h=di.height;
 			for(int m=0;m<di.mipCount;m++){
-				uint32_t sz=mipByteSize(w,h,di.bytesPerBlock);
+				uint32_t sz=mipByteSize(w,h,di.bytesPerBlock,di.blockCompressed);
 				if((size_t)off+(size_t)sz>buf.size()) break; // truncated file -> stop, keep what we have
 				// A base (mip00) file supplies level m as our mip m; a standalone per-mip file
 				// supplies only its own level, which is the map key we found it under.
@@ -270,7 +300,13 @@ namespace LatteTextureReplace
 			}
 		}
 		auto d=g.decoded.find(mipIndex);
-		if(d==g.decoded.end() || !d->second.data){ cemuLog_log(LogType::Force,"[TextureReplace] load failed: {}",ref.path.string()); return nullptr; } // don't cache failure -> allow retry
+		if(d==g.decoded.end() || !d->second.data){
+			// rate limited on purpose: this sits on a per-frame path, and an unbounded log here once
+			// wrote gigabytes before the display driver gave up
+			static uint32_t s_failLog=0;
+			if(s_failLog<32){ s_failLog++; cemuLog_log(LogType::Force,"[TextureReplace] load failed: {}",ref.path.string()); }
+			return nullptr; // don't cache failure -> allow retry
+		}
 		return &d->second;
 	}
 

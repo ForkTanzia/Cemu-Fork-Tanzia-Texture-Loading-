@@ -1354,7 +1354,8 @@ LatteTexture::LatteTexture(Latte::E_DIM dim, MPTR physAddress, MPTR physMipAddre
 	// and the texture renders blank instead of vanilla. Uncompressed surfaces are also not merely
 	// unsupported -- R8_G8_B8_A8 is the format of render targets and the scan buffer, so admitting
 	// one here would resize or reformat a framebuffer.
-	if (!this->overwriteInfo.hasResolutionOverwrite && LatteTextureReplace::IsEnabled() && Latte::IsCompressedFormat(format))
+	if (!this->overwriteInfo.hasResolutionOverwrite && LatteTextureReplace::IsEnabled() &&
+		(Latte::IsCompressedFormat(format) || LatteTextureReplace::IsReplaceableUncompressed(format)))
 	{
 		LatteAddrLib::AddrSurfaceInfo_OUT _replSI;
 		LatteAddrLib::GX2CalculateSurfaceInfo(format, width, height, depth, dim, Latte::MakeGX2TileMode(tileMode), 0, 0, &_replSI);
@@ -1363,6 +1364,7 @@ LatteTexture::LatteTexture(Latte::E_DIM dim, MPTR physAddress, MPTR physMipAddre
 		if (LatteTextureReplace::GetInfo(_replHash, _ri))
 		{
 			this->overwriteInfo.hasResolutionOverwrite = true;
+			this->replOverwriteIsOurs = true;
 			this->overwriteInfo.width = _ri.width;
 			this->overwriteInfo.height = _ri.height;
 			this->overwriteInfo.depth = depth;
