@@ -196,10 +196,6 @@ uint32 LatteTexture_CalculateTextureDataHash(LatteTexture* hostTexture)
 	return hashVal;
 }
 
-// Standalone content hash over raw guest bytes. Mirrors the general path of
-// LatteTexture_CalculateTextureDataHash so a hash can be computed at texture creation
-// (before texDataPtr is set) for texture replacement. Matches for all compressed and
-// <=1200px uncompressed textures (the AVX2 huge-uncompressed path is not duplicated).
 uint64 _botwLargeTexHax = 0;
 
 bool LatteTC_HasTextureChanged(LatteTexture* hostTexture, bool force)

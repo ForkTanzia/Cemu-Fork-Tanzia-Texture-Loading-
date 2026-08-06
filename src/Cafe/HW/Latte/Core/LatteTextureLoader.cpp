@@ -637,7 +637,17 @@ void LatteTextureLoader_UpdateTextureSliceData(LatteTexture* tex, uint32 sliceIn
 	// Our own full-data content hash of the mip0 surface. Recomputed on every load so a reused
 	// texture object never carries a stale key. Cemu's texDataHash2 is NOT usable here: it samples
 	// only ~296 bytes and collides between distinct textures (e.g. monster subspecies).
-	const bool _replUncompressed = LatteTextureReplace::IsReplaceableUncompressed(format);
+	// Uncompressed surfaces the GPU owns are skipped before the hash runs. RGBA8 is both what the
+	// UI sheets use and what render targets use, so the format alone cannot tell them apart --
+	// but a texture the GPU has drawn into, or one resized by a graphic pack rather than by us,
+	// is a render target. Neither is ever true of artwork loaded from the game's own files, so
+	// nothing replaceable is affected. This matters because these are the large surfaces (~8 MB
+	// at 1080p) and they reload constantly, while their contents change every frame and could
+	// never match a file on disk. The compressed formats need no such test: nothing renders into
+	// a BCn surface.
+	const bool _replGpuOwned = tex->isUpdatedOnGPU ||
+		(tex->overwriteInfo.hasResolutionOverwrite && !tex->replOverwriteIsOurs);
+	const bool _replUncompressed = LatteTextureReplace::IsReplaceableUncompressed(format) && !_replGpuOwned;
 	if (mipIndex == 0 && sliceIndex == 0 && LatteTextureReplace::IsEnabled() && (Latte::IsCompressedFormat(format) || _replUncompressed))
 		tex->replStrongHash = LatteTextureReplace::HashGuest(physImagePtr, (uint32)textureLoader.maxOffsetOutdated, tex->width * tex->height, format);
 
