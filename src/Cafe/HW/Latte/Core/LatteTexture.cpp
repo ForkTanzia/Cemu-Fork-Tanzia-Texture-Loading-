@@ -1159,9 +1159,24 @@ LatteTextureView* LatteTC_GetTextureSliceViewOrTryCreate(MPTR srcImagePtr, MPTR 
 // [texture replacement] Rebuild one texture so the creation-time size/format overwrite runs again
 // with settled guest data. Modeled on LatteTexture_RecreateTextureWithDifferentMipSliceCount but
 // keeps identical parameters. Recreating a single texture avoids a full cache flush.
+
+// [texture replacement] How many times one texture may be recreated chasing a replacement whose
+// size will not reconcile. A genuine stale overwrite resolves on the first attempt; anything still
+// mismatched after a few tries never will -- a truncated or malformed DDS in someone's pack, for
+// instance -- and would otherwise be recreated on every recheck pass for the rest of the session.
+static constexpr uint16 kMaxReplRecreateAttempts = 8;
+
 static void LatteTexture_RecreateForReplacement(LatteTexture* texture)
 {
 	LatteTextureView* view = LatteTexture_CreateTexture(texture->dim, texture->physAddress, texture->physMipAddress, texture->format, texture->width, texture->height, texture->depth, texture->pitch, texture->mipLevels, texture->swizzle, texture->tileMode, texture->isDepth);
+	// Carry the attempt count onto the new object. Recreating makes a NEW texture and deletes this
+	// one, so a counter left behind here would never accumulate and the cap would never be reached.
+	view->baseTexture->replRecheckCount = (uint16)(texture->replRecheckCount + 1);
+	if (view->baseTexture->replRecheckCount >= kMaxReplRecreateAttempts)
+	{
+		view->baseTexture->replGaveUp = true;
+		cemuLog_log(LogType::Force, "[TextureReplace] {:016x} still mismatched after {} attempts - leaving it alone", texture->replStrongHash, (uint32)view->baseTexture->replRecheckCount);
+	}
 	if (texture->isUpdatedOnGPU)
 	{
 		LatteTexture_copyData(texture, view->baseTexture, texture->mipLevels, texture->depth);
@@ -1187,6 +1202,8 @@ void LatteTexture_RecheckReplacements()
 		if (tex && tex->needsReplRecreate)
 		{
 			tex->needsReplRecreate = false;
+			if (tex->replGaveUp)
+				continue; // already capped out, don't churn on it again
 			LatteTexture_RecreateForReplacement(tex);
 			return;
 		}
